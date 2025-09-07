@@ -1,0 +1,75 @@
+#define F_CPU 16000000UL
+#include <avr/io.h>
+#include <util/delay.h>
+#include <avr/interrupt.h>
+#define PIR_PIN      PD2
+#define BUTTON_PIN   PD3
+#define LED_PIN      PB0
+#define BUZZER_PIN   PB1
+volatile uint8_t motion_detected = 0;
+volatile uint8_t armed = 0;
+ISR(INTO_vect){
+ if (armed){
+    motion_detected = 1;
+ }
+}
+ISR(PCINT2_vect) {
+if (!(PIND & (1<< BUTTON_PIN))) {
+   _delay_ms(50);
+   if (!(PIND & (1 << BUTTON_PIN))) {
+      armed = !armed;
+      if (!armed) motion_detected = 0;
+      while (!(PIND & (1 << BUTTON_PIN)));
+   }
+}
+}
+void setup() {
+  DDRD &= ~(1 << PIR_PIN);
+  EIMSK |= (1 << INTO);
+  EICRA |= (1 << ISC01);
+  DDRD &= ~(1 << BUTTON_PIN);
+  PCICR |= (1 << PCIE2);
+  PCMSK2 |= (1 << PCINT19);
+  DDRB |= (1 << LED_PIN) | (1 << BUZZER_PIN);
+  UBRRO = 103;
+  UCSROB |= (1<<TXEN0);
+  UCSROC |= (1<<UCSZ01) | (1<<USCZ00);
+  SEI();
+}
+void uart_print(const char *s) {
+  while (*S) {
+      while (!(UCSROA & (1<<UDREO)));
+      UDRO = *S++;
+  }
+}
+void alarm_sound_on() {
+  PORTB |= (1 << BUZZER_PIN);
+}
+void alarm_sound_off() {
+  PORTB &= ~(1 << BUZZER_PIN);
+}
+void led_on() {
+  PORTB |= (1 << LED_PIN);
+}
+void led_off() {
+  PORTB &= ~(1 << LED_PIN);
+}
+int main(void) {
+  setup();
+uart_print("Home Security System Starting...\r\n");
+while(1) {
+ if(armed) {
+led_on();
+if (motion_detected) {
+uart_print("Motion Detected! Alarm!\r\n");
+alarm_sound_on();
+}
+ } else {
+led_off();
+alarm_sound_off();
+ }
+_delay_ms(200);
+}
+return 0;
+
+   
